@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VirtualLine • Site Hub</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1016;color:#e8f0fb}
+    header{display:flex;align-items:center;justify-content:space-between;padding:16px;background:#111924;border-bottom:1px solid #213044}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .card{background:#111924;border:1px solid #213044;border-radius:12px;padding:16px}
+    .muted{color:#9fb0c2}
+    select,button,a.button{background:#0b1016;color:#e8f0fb;border:1px solid #2a3b52;border-radius:8px;padding:10px 12px;text-decoration:none;display:inline-block}
+    .row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:10px 0;border-bottom:1px solid #213044}
+    .head{font-size:12px;color:#9fb0c2;text-transform:uppercase;letter-spacing:.06em}
+    @media(max-width:900px){.cards{grid-template-columns:1fr} .row{grid-template-columns:1.5fr 1fr 1fr} .hide-sm{display:none}}
+    .cta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Public Line & Driver Hub</strong>
+    <div class="cta">
+      <select id="site">
+        <option value="CIF">CIF – Cargill Iowa Falls</option>
+        <option value="CCR">CCR – Cargill Cedar Rapids</option>
+      </select>
+      <a id="btnPickup" class="button" href="/driver-checkin.html">I'm picking up</a>
+      <a id="btnDeliver" class="button" href="/driver-checkin-delivery.html">I'm delivering</a>
+      <button id="refresh">Refresh</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="cards">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">Loading Line</h3>
+        <div class="muted">En Route: <span id="enrouteLoad">0</span></div>
+        <div id="etaLoad" class="muted" style="margin:6px 0 12px 0;"></div>
+        <div class="row head"><div>Masked Phone</div><div>Arrival</div><div class="hide-sm">Product</div><div>Load #</div></div>
+        <div id="listLoad"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">Delivery Line</h3>
+        <div class="muted">En Route: <span id="enrouteDeliver">0</span></div>
+        <div id="etaDeliver" class="muted" style="margin:6px 0 12px 0;"></div>
+        <div class="row head"><div>Masked Phone</div><div>Arrival</div><div class="hide-sm">Product</div><div>Load #</div></div>
+        <div id="listDeliver"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="muted">Total En Route (all lines): <span id="totalEnRoute">0</span></div>
+    </div>
+  </div>
+
+  <script>
+    async function j(u){ const r=await fetch(u); return r.json(); }
+    function fmt(ts){ if(!ts) return ''; const d=new Date(ts); return d.toLocaleTimeString(); }
+    function fillList(el, items){
+      el.innerHTML='';
+      (items||[]).forEach(t=>{
+        const row=document.createElement('div'); row.className='row';
+        row.innerHTML=`<div>${t.phone||''}</div><div>${fmt(t.arrived_at||t.created_at)}</div><div class="hide-sm">${t.product||''}</div><div>${t.load_number||''}</div>`;
+        el.appendChild(row);
+      });
+    }
+    async function load(){
+      const s=document.getElementById('site').value;
+      // update driver links with site param (optional; driver pages also have their own site controls if present)
+      document.getElementById('btnPickup').href = `/driver-checkin.html?site=${encodeURIComponent(s)}`;
+      document.getElementById('btnDeliver').href = `/driver-checkin-delivery.html?site=${encodeURIComponent(s)}`;
+
+      const d=await j(`/api/public/${s}/lines`);
+      document.getElementById('totalEnRoute').textContent = d.total_en_route||0;
+
+      document.getElementById('enrouteLoad').textContent = d.lines.load.en_route_count||0;
+      document.getElementById('etaLoad').textContent = (d.lines.load.en_route_eta||[]).map(x=>`${x.phone||''} ETA: ${x.eta_minutes? x.eta_minutes+' min' : (x.eta_at||'')}`).join('  •  ');
+      fillList(document.getElementById('listLoad'), d.lines.load.queued);
+
+      document.getElementById('enrouteDeliver').textContent = d.lines.deliver.en_route_count||0;
+      document.getElementById('etaDeliver').textContent = (d.lines.deliver.en_route_eta||[]).map(x=>`${x.phone||''} ETA: ${x.eta_minutes? x.eta_minutes+' min' : (x.eta_at||'')}`).join('  •  ');
+      fillList(document.getElementById('listDeliver'), d.lines.deliver.queued);
+    }
+    document.getElementById('refresh').onclick = load;
+    document.getElementById('site').onchange = load;
+    load(); setInterval(load, 20000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>VirtualLine • Check In</title>
+  <style>
+    :root{ --bg:#0b1016; --panel:#111924; --border:#213044; --text:#e8f0fb; --muted:#9fb0c2 }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    header{padding:18px 16px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0}
+    .wrap{max-width:880px;margin:0 auto;padding:16px}
+    .h1{font-size:24px;font-weight:800;letter-spacing:.2px}
+    .muted{color:var(--muted)}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;margin:16px 0}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .cta{display:flex;flex-direction:column;gap:12px}
+    a.button,button{display:block;text-align:center;text-decoration:none;padding:18px 16px;border-radius:14px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-weight:800;font-size:18px}
+    a.primary{background:#1f5eff;border-color:#1f5eff;color:white}
+    .tiny{font-size:13px}
+    select{width:100%;padding:14px 12px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+    @media(min-width:740px){ .row{grid-template-columns:1fr 1fr} }
+  </style>
+</head>
+<body>
+  <header><div class="h1">VirtualLine — Check In</div></header>
+  <div class="wrap">
+    <div class="card">
+      <div class="muted tiny" id="siteNote">Pick your plant:</div>
+      <select id="site">
+        <option value="CIF">CIF — Cargill Iowa Falls</option>
+        <option value="CCR">CCR — Cargill Cedar Rapids</option>
+      </select>
+      <div class="cta" style="margin-top:14px">
+        <a id="pickup" class="button primary" href="#">I’m picking up (Loading Line)</a>
+        <a id="deliver" class="button" href="#">I’m delivering (Delivery Line)</a>
+        <a id="view" class="button" href="#">View the line (public)</a>
+      </div>
+      <div class="muted tiny" style="margin-top:10px">
+        Tip: save this page to your home screen for quicker check-ins.
+      </div>
+    </div>
+    </div>
+    <div class="card"><div class="muted tiny">Hours of Operation</div><div id="hoursBox" class="muted tiny">Loading…</div></div>
+    <div class="card">
+      <div class="muted tiny">Questions?</div>
+      <div class="tiny">If you’ve already texted an ETA, you can reply ARRIVED / LOADING / UNLOADING / DEPARTED to update your status by SMS.</div>
+    </div>
+  </div>
+  <script>
+    // Helper: read ?site=CIF and preselect
+    const params = new URLSearchParams(location.search);
+    const siteSel = document.getElementById('site');
+    const s = (params.get('site')||'').toUpperCase();
+    if (s==='CIF' || s==='CCR'){ siteSel.value = s; document.getElementById('siteNote').textContent = 'Confirm your plant:'; }
+
+
+    async function loadHours(site){
+      try{
+        const res = await fetch('/hours.json');
+        if(!res.ok) return;
+        const data = await res.json();
+        const s = data.sites?.[site];
+        const box = document.getElementById('hoursBox');
+        if(!s){ box.innerHTML = '<div class="muted tiny">Hours not available.</div>'; return; }
+        const dl = s.lines?.DELIVER, ld = s.lines?.LOAD;
+        let html = '';
+        if (dl){
+          html += `<div class="card"><div><strong>${s.name} — Deliveries</strong>` + (dl.week_of? ` <span class="muted tiny">(Week of ${dl.week_of})</span>`:'') + `</div>`;
+          if (dl.schedule && dl.schedule.length){
+            html += '<div class="row" style="grid-template-columns:1fr 1fr">';
+            dl.schedule.forEach(x=>{ html += `<div class="muted">${x.day}</div><div>${x.hours}</div>`; });
+            html += '</div>';
+          } else {
+            html += '<div class="muted tiny">No posted delivery schedule.</div>';
+          }
+          if (dl.notes && dl.notes.length){
+            html += '<div class="muted tiny" style="margin-top:6px">' + dl.notes.map(n=>`• ${n}`).join('<br>') + '</div>';
+          }
+          html += '</div>';
+        }
+        if (ld){
+          html += '<div class="card"><div><strong>' + s.name + ' — Pickups</strong></div>';
+          if (ld.products && ld.products.length){
+            html += '<div class="row" style="grid-template-columns:1fr 1fr">';
+            ld.products.forEach(p=>{ html += `<div class="muted">${p.name}</div><div>${p.hours}</div>`; });
+            html += '</div>';
+          } else {
+            html += '<div class="muted tiny">No posted pickup hours.</div>';
+          }
+          html += '</div>';
+        }
+        box.innerHTML = html;
+      }catch(e){
+        console.error(e);
+      }
+    }
+
+    function links(){
+      const site = siteSel.value;
+      document.getElementById('pickup').href = `/driver-checkin.html?site=${encodeURIComponent(site)}`;
+      document.getElementById('deliver').href = `/driver-checkin-delivery.html?site=${encodeURIComponent(site)}`;
+      document.getElementById('view').href = `/hub.html?site=${encodeURIComponent(site)}`;
+    }
+    links();
+    siteSel.onchange = ()=>{ links(); loadHours(siteSel.value); };
+
+    // If launched from a QR that includes the site, auto-advance after a short delay
+    if (s==='CIF' || s==='CCR'){
+      loadHours(s);
+      setTimeout(()=>{ /* no auto-nav; let driver choose */ }, 1);
+    } else { loadHours(siteSel.value); }
+  </script>
+</body>
+</html>

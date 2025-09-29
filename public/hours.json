@@ -1,0 +1,79 @@
+{
+  "sites": {
+    "CCR": {
+      "name": "Cargill Cedar Rapids",
+      "lines": {
+        "DELIVER": {
+          "label": "Deliveries",
+          "week_of": "2025-09-29",
+          "schedule": [
+            {
+              "day": "Monday",
+              "hours": "6:00 AM \u2013 8:00 PM"
+            },
+            {
+              "day": "Tuesday",
+              "hours": "6:00 AM \u2013 8:00 PM"
+            },
+            {
+              "day": "Wednesday",
+              "hours": "6:00 AM \u2013 8:00 PM"
+            },
+            {
+              "day": "Thursday",
+              "hours": "6:00 AM \u2013 8:00 PM"
+            },
+            {
+              "day": "Friday",
+              "hours": "6:00 AM \u2013 8:00 PM"
+            },
+            {
+              "day": "Saturday",
+              "hours": "TBD \u2013 TBD"
+            },
+            {
+              "day": "Sunday",
+              "hours": "TBD \u2013 TBD"
+            }
+          ],
+          "notes": [
+            "Sunday 7:00 PM \u2192 Saturday 7:00 AM open",
+            "Closed Saturday 7:00 PM \u2192 Sunday 7:00 AM"
+          ]
+        },
+        "LOAD": {
+          "label": "Pickups",
+          "products": [
+            {
+              "name": "Soybean Meal",
+              "hours": "24/7"
+            },
+            {
+              "name": "Soybean Pellets",
+              "hours": "24/7"
+            },
+            {
+              "name": "Soy Hulls",
+              "hours": "West Side plant only"
+            }
+          ]
+        }
+      }
+    },
+    "CIF": {
+      "name": "Cargill Iowa Falls",
+      "lines": {
+        "DELIVER": {
+          "label": "Deliveries",
+          "week_of": null,
+          "schedule": [],
+          "notes": []
+        },
+        "LOAD": {
+          "label": "Pickups",
+          "products": []
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: VirtualLineCargill
+    env: node
+    plan: free
+    buildCommand: |
+      cd server
+      npm ci --include=dev
+      node migrate-pg.js || echo "pg migrate skipped (no DATABASE_URL?)"
+    startCommand: bash -lc 'cd server && node index.js'
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: SESSION_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: PGSSLMODE
+        value: require
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_MESSAGING_SERVICE_SID
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: GEOFENCE_RADIUS_M
+        value: 250
+      - key: GEO_PING_INTERVAL_MIN
+        value: 5

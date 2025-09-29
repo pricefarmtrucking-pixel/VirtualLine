@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>VirtualLine • Admin History</title>
+<style>
+body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1016;color:#e8f0fb}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px;background:#111924;border-bottom:1px solid #213044}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+input,select,button{background:#0b1016;color:#e8f0fb;border:1px solid #2a3b52;border-radius:8px;padding:10px 12px}
+button{cursor:pointer;font-weight:700}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{border-bottom:1px solid #213044;padding:8px;text-align:left;font-size:14px}
+.muted{color:#9fb0c2}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+</style></head>
+<body>
+<header>
+  <strong>Admin History</strong>
+  <div class="controls">
+    <select id="site"><option value="CIF">CIF — Cargill Iowa Falls</option><option value="CCR">CCR — Cargill Cedar Rapids</option></select>
+    <input id="start" type="date" /><input id="end" type="date" />
+    <select id="lineType"><option value="ALL">All Lines</option><option value="LOAD">Loading Line</option><option value="DELIVER">Delivery Line</option></select> <button id="run">Run</button><button id="export">Export CSV</button>
+  </div>
+</header>
+<div class="wrap">
+  <div id="summary" class="muted"></div>
+  <table id="tbl"><thead><tr><th>ID</th><th>Phone</th><th>Product</th><th>Load #</th><th>Status</th><th>Arrived</th><th id="loadHead">Loading</th><th>Departed</th><th>Wait (min)</th><th>Total (min)</th></tr></thead><tbody></tbody></table>
+</div>
+<script>
+async function j(u){const r=await fetch(u);return r.json();}
+function m(ts){return ts?new Date(ts).toLocaleString():'';}
+function mm(ms){return (ms!=null)?Math.round(ms/60000):'';}
+async function run(){
+  const site=document.getElementById('site').value;
+  const type=document.getElementById('lineType').value;
+  const start=document.getElementById('start').value;
+  const end=document.getElementById('end').value;
+  const d=await j(`/api/admin/history/${site}?start=${start}&end=${end}&type=${type}`);
+  if(!d.ok){document.getElementById('summary').textContent=d.error||'Error';return;}
+  const a=d.analytics||{};
+  document.getElementById('summary').textContent=`Rows: ${d.count} • Avg Wait: ${a.avg_wait_min??'—'} min • Avg Total: ${a.avg_total_min??'—'} min`;
+  const tb=document.querySelector('#tbl tbody'); tb.innerHTML='';
+  (d.rows||[]).forEach(t=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${t.id}</td><td>${t.phone||''}</td><td>${t.product||''}</td><td>${t.load_number||''}</td><td>${t.status||''}</td><td>${m(t.arrived_at)}</td><td>${m(t.loading_at)}</td><td>${m(t.departed_at)}</td><td>${mm(t.wait_ms)}</td><td>${mm(t.total_ms)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+document.getElementById('run').onclick=run;
+document.getElementById('lineType').onchange=run;
+document.getElementById('export').onclick=()=>{
+  const site=document.getElementById('site').value;
+  const type=document.getElementById('lineType').value;
+  const start=document.getElementById('start').value;
+  const end=document.getElementById('end').value;
+  location.href=`/api/admin/history/${site}/export.csv?start=${start}&end=${end}`;
+};
+const now=new Date(); const endISO=now.toISOString().slice(0,10); const startISO=new Date(now.getTime()-6*86400000).toISOString().slice(0,10);
+document.getElementById('start').value=startISO; document.getElementById('end').value=endISO; run();
+</script>
+</body></html>

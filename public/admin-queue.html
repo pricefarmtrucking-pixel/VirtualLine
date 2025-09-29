@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VirtualLine • Admin Queue</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1016;color:#e8f0fb}
+    header{display:flex;align-items:center;justify-content:space-between;padding:16px;background:#111924;border-bottom:1px solid #213044}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    select,input,button{background:#0b1016;color:#e8f0fb;border:1px solid #2a3b52;border-radius:8px;padding:10px 12px}
+    button{font-weight:700;cursor:pointer}
+    .grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:8px;align-items:center}
+    .row{padding:10px;border-bottom:1px solid #213044}
+    .head{font-size:12px;color:#9fb0c2;text-transform:uppercase;letter-spacing:.06em}
+    .badge{padding:4px 8px;border-radius:999px;border:1px solid #2a3b52;font-size:12px;display:inline-block}
+    .muted{color:#9fb0c2}
+    .ok{background:#10331f;border-color:#1e6b4a}
+    .danger{background:#331010;border-color:#6b1e1e}
+    table{width:100%;border-collapse:collapse}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .foot{margin-top:16px;font-size:12px;color:#9fb0c2}
+    @media(max-width:900px){.grid{grid-template-columns:1.5fr 1fr 1fr 1fr 1fr} .hide-md{display:none}}
+    @media(max-width:640px){.grid{grid-template-columns:1.5fr 1fr 1fr} .hide-sm{display:none}}
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Admin Queue</strong>
+    <div class="controls">
+      <select id="site">
+        <option value="CIF">CIF — Cargill Iowa Falls</option>
+        <option value="CCR">CCR — Cargill Cedar Rapids</option>
+      </select>
+      <select id="lineType"><option value="LOAD">Loading Line</option><option value="DELIVER">Delivery Line</option></select> <button id="refresh">Refresh</button> <button id="export">Export CSV</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="controls" style="margin:8px 0;gap:8px;"><label class="muted">Filter:</label><select id="filter"><option>All</option><option>En Route</option><option>Arrived</option><option>Loading</option><option>Departed</option></select><span id="counts" class="muted"></span></div>
+    <div class="grid head row">
+      <div>Driver / Phone</div>
+      <div>Product</div>
+      <div class="hide-md">Load #</div>
+      <div class="hide-sm">BOL</div>
+      <div>Status</div>
+      <div>Actions</div>
+    </div>
+    <div id="rows"></div>
+    <div class="foot">Statuses: En Route → Arrived → Loading → Departed</div>
+  </div>
+  <script>
+    async function j(url, opts={}){
+      const res = await fetch(url, Object.assign({ headers:{'Content-Type':'application/json'} }, opts));
+      return res.json();
+    }
+    async function who(){
+      const w = await j('/api/whoami');
+      if (!w.ok || !w.isAdmin){ document.body.innerHTML='<div class="wrap"><h2>Admin only</h2><p class="muted">Please sign in with an admin phone.</p></div>'; }
+    }
+    async function load(){
+      const site = document.getElementById('site').value;
+      const filt=document.getElementById('filter').value;
+      const qs=(filt&&filt!=='All')?`?status=${encodeURIComponent(filt)}`:'';
+      const data=await j(`/api/admin/queue/${site}/today${qs}`);
+      const rowsEl = document.getElementById('rows'); rowsEl.innerHTML='';
+      if (!data.ok){ document.getElementById('status').textContent = data.error || 'Error'; return; }
+      document.getElementById('status').textContent = `Trucks: ${data.count}`;
+      for (const t of data.trucks){
+        const row = document.createElement('div'); row.className='grid row';
+        const phone = t.phone || '';
+        row.innerHTML = `
+          <div>${phone} <div class="muted">${t.created_at||''}</div></div>
+          <div>${t.product||''}</div>
+          <div class="hide-md">${t.load_number||''}</div>
+          <div class="hide-sm">${t.bill_of_lading||''}</div>
+          <div><span class="badge">${fmtStatus(t.status)}</span></div>
+          <div class="controls">
+            ${btns(t.id).join('')} <button onclick="move(${t.id},'up')">↑</button> <button onclick="move(${t.id},'down')">↓</button> <button onclick="ping(${t.id})">Ping SMS</button>
+          </div>
+        `;
+        rowsEl.appendChild(row);
+      }
+    }
+    function fmtStatus(s){
+      if (!s) return '';
+      s = s.replace('_',' ');
+      return s.split(' ').map(x=>x[0]+x.slice(1).toLowerCase()).join(' ');
+    }
+    function btns(id){
+      const mk = (label)=>`<button onclick="setStatus(${id}, '${label}')">${label}</button>`;
+      return [mk('En Route'), mk('Arrived'), mk('Loading'), mk('Departed'), `<button onclick="markEnRouteWithETA(${id})">En Route + ETA</button>`];
+    }
+    async function setStatus(id, label){
+      const body = JSON.stringify({ truck_id:id, status:label });
+      const out = await j('/api/admin/queue/update-status', { method:'POST', body });
+      if (out && out.ok){ load(); }
+    }
+    document.getElementById('refresh').onclick = load;
+    document.getElementById('site').onchange=load;
+    document.getElementById('filter').onchange=load;
+    document.getElementById('export').onclick=()=>{const site=document.getElementById('site').value;window.location.href=`/api/admin/queue/${site}/export.csv`;};
+    who().then(load);
+    setInterval(load, 15000);
+  
+    async function move(id,dir){ await j('/api/admin/queue/move',{method:'POST',body:JSON.stringify({truck_id:id,direction:dir})}); load();}
+    async function ping(id){ const msg=prompt('SMS message to driver:','Please proceed to the gate.'); if(msg===null) return; const out=await j('/api/admin/queue/ping',{method:'POST',body:JSON.stringify({truck_id:id,message:msg})}); if(!out.ok){alert('Failed to send');}}
+    
+  
+    async function markEnRouteWithETA(id){
+      const eta = prompt('Minutes until arrival? (ETA)');
+      if (eta===null) return;
+      const n = Number(eta);
+      if (!Number.isFinite(n) || n<=0){ alert('Enter a positive number'); return; }
+      // Use the ping endpoint to notify, but we also set status via update-status
+      await j('/api/admin/queue/update-status', { method:'POST', body: JSON.stringify({ truck_id:id, status:'En Route' }) });
+      // Also update ETA on the truck directly (reusing public enroute endpoint not appropriate for admin)
+      // We'll call a small admin helper
+      await j('/api/admin/queue/set-eta', { method:'POST', body: JSON.stringify({ truck_id:id, eta_minutes:n }) });
+      load();
+    }
+  </script>
+</body>
+</html>
